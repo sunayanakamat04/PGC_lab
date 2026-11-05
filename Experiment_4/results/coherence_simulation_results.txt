@@ -1,0 +1,40 @@
+State trace, first 2 iterations, adjacent layout (line A: core0 state / core1 state)
+
+MSI:
+ core0 R -> C0=S C1=I
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+ core0 R -> C0=S C1=S
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+
+MESI:
+ core0 R -> C0=E C1=I
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+ core0 R -> C0=S C1=S
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+
+MOESI:
+ core0 R -> C0=E C1=I
+ core0 W -> C0=M C1=I
+ core1 R -> C0=O C1=S
+ core1 W -> C0=I C1=M
+ core0 R -> C0=S C1=O
+ core0 W -> C0=M C1=I
+ core1 R -> C0=O C1=S
+ core1 W -> C0=I C1=M
+
+Totals for 1000 iterations (4000 memory operations):
+layout    protocol bus transactions            BusRd           BusRdX          BusUpgr    invalidations        writeback              c2c      silent E->M
+adjacent  MSI                4000             2000                0             2000             1999             1999                0                0
+adjacent  MESI               3999             2000                0             1999             1999             1999                0                1
+adjacent  MOESI              3999             2000                0             1999             1999                0             1999                1
+padded    MSI                   4                2                0                2                0                0                0                0
+padded    MESI                  2                2                0                0                0                0                0                2
+padded    MOESI                 2                2                0                0                0                0                0                2

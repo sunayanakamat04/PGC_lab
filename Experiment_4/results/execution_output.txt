@@ -1,0 +1,158 @@
+================================================================================
+EXPERIMENT 4: ANALYZE CACHE COHERENCE (MSI, MESI, MOESI) AND NUMA PERFORMANCE
+Platform: Ubuntu 22.04 LTS (WSL2)
+Hardware: 12th Gen Intel(R) Core(TM) i5-12500H (16 vCPUs)
+Compiler: gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+Tools: numactl 2.0.19, hwloc 2.13.0, Python 3.14.3
+================================================================================
+
+[STEP 21 & 22: Verify GCC, OpenMP runtime]
+$ gcc --version
+gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+$ echo '#include <omp.h>' | gcc -E -fopenmp -xc - > /dev/null && echo OpenMP OK
+OpenMP OK
+
+[STEP 23: Verify CPU Layout and NUMA Nodes]
+$ lscpu | grep -E 'Socket|Core|Thread|NUMA'
+Model name:                              12th Gen Intel(R) Core(TM) i5-12500H
+Thread(s) per core:                      2
+Core(s) per socket:                      8
+Socket(s):                               1
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-15
+
+$ numactl --hardware
+available: 1 nodes (0)
+node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+node 0 size: 7751 MB
+node 0 free: 6186 MB
+node distances:
+node     0 
+   0:   10 
+
+$ lscpu -e
+CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE
+  0    0      0    0 0:0:0:0          yes
+  1    0      0    0 0:0:0:0          yes
+  2    0      0    1 1:1:1:0          yes
+  3    0      0    1 1:1:1:0          yes
+  4    0      0    2 2:2:2:0          yes
+  5    0      0    2 2:2:2:0          yes
+  6    0      0    3 3:3:3:0          yes
+  7    0      0    3 3:3:3:0          yes
+  8    0      0    4 4:4:4:0          yes
+  9    0      0    4 4:4:4:0          yes
+ 10    0      0    5 5:5:5:0          yes
+ 11    0      0    5 5:5:5:0          yes
+ 12    0      0    6 6:6:6:0          yes
+ 13    0      0    6 6:6:6:0          yes
+ 14    0      0    7 7:7:7:0          yes
+ 15    0      0    7 7:7:7:0          yes
+
+[STEP 4: Protocol Simulator - MSI vs MESI vs MOESI]
+$ python3 coherence_sim.py 1000
+State trace, first 2 iterations, adjacent layout (line A: core0 state / core1 state)
+
+MSI:
+ core0 R -> C0=S C1=I
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+ core0 R -> C0=S C1=S
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+
+MESI:
+ core0 R -> C0=E C1=I
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+ core0 R -> C0=S C1=S
+ core0 W -> C0=M C1=I
+ core1 R -> C0=S C1=S
+ core1 W -> C0=I C1=M
+
+MOESI:
+ core0 R -> C0=E C1=I
+ core0 W -> C0=M C1=I
+ core1 R -> C0=O C1=S
+ core1 W -> C0=I C1=M
+ core0 R -> C0=S C1=O
+ core0 W -> C0=M C1=I
+ core1 R -> C0=O C1=S
+ core1 W -> C0=I C1=M
+
+Totals for 1000 iterations
+layout    protocol bus transactions            BusRd           BusRdX          BusUpgr    invalidations        writeback              c2c      silent E->M
+adjacent  MSI                4000             2000                0             2000             1999             1999                0                0
+adjacent  MESI               3999             2000                0             1999             1999             1999                0                1
+adjacent  MOESI              3999             2000                0             1999             1999                0             1999                1
+padded    MSI                   4                2                0                2                0                0                0                0
+padded    MESI                  2                2                0                0                0                0                0                2
+padded    MOESI                 2                2                0                0                0                0                0                2
+
+[STEP 5, 6, 7: Compiling C Programs with -O2 and -fopenmp]
+$ gcc -O2 false_sharing.c -fopenmp -o false_sharing
+$ gcc -O2 numa_sweep.c -fopenmp -o numa_sweep
+$ gcc -O2 compare_numa.c -fopenmp -o compare_numa
+
+[STEP 8: False Sharing Testing with 2 Threads]
+$ OMP_NUM_THREADS=2 ./false_sharing adjacent
+adjacent | threads=2 | total=100000000 | time=0.0236 s
+
+$ OMP_NUM_THREADS=2 ./false_sharing padded
+padded   | threads=2 | total=100000000 | time=0.0184 s
+
+[STEP 9: Comparison Benchmark Program - Default Placement]
+$ ./compare_numa
+Table 1: false sharing (100000000 increments in total)
+Layout   | Threads | Final Count | Correctness | Time (s)
+---------------------------------------------------------
+adjacent |       1 |   100000000 | Correct     |   0.0387
+padded   |       1 |   100000000 | Correct     |   0.0354
+---------------------------------------------------------
+adjacent |       2 |   100000000 | Correct     |   0.0219
+padded   |       2 |   100000000 | Correct     |   0.0184
+---------------------------------------------------------
+adjacent |       4 |   100000000 | Correct     |   0.0185
+padded   |       4 |   100000000 | Correct     |   0.0175
+---------------------------------------------------------
+
+Table 2: memory sweep of 512 MB (4 passes)
+Threads | Time (s)
+-------------------
+      1 |   0.1313
+      2 |   0.0806
+
+[STEP 10 & 11: NUMA Binding with numactl]
+$ numactl --cpunodebind=0 --membind=0 ./compare_numa
+Table 1: false sharing (100000000 increments in total)
+Layout   | Threads | Final Count | Correctness | Time (s)
+---------------------------------------------------------
+adjacent |       1 |   100000000 | Correct     |   0.0525
+padded   |       1 |   100000000 | Correct     |   0.0422
+---------------------------------------------------------
+adjacent |       2 |   100000000 | Correct     |   0.0270
+padded   |       2 |   100000000 | Correct     |   0.0200
+---------------------------------------------------------
+adjacent |       4 |   100000000 | Correct     |   0.0203
+padded   |       4 |   100000000 | Correct     |   0.0174
+---------------------------------------------------------
+
+Table 2: memory sweep of 512 MB (4 passes)
+Threads | Time (s)
+-------------------
+      1 |   0.1866
+      2 |   0.0847
+
+[STEP 12: Affinity Pinning on Separate Physical Cores (0 and 2)]
+$ OMP_NUM_THREADS=2 taskset -c 0,2 ./false_sharing adjacent
+adjacent | threads=2 | total=100000000 | time=0.0266 s
+
+$ OMP_NUM_THREADS=2 taskset -c 0,2 ./false_sharing padded
+padded   | threads=2 | total=100000000 | time=0.0191 s

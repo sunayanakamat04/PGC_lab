@@ -1,0 +1,13 @@
+Benchmark,Layout,Threads,Final_Count,Correctness,Execution_Time_s
+False_Sharing,adjacent,1,100000000,Correct,0.0387
+False_Sharing,padded,1,100000000,Correct,0.0354
+False_Sharing,adjacent,2,100000000,Correct,0.0219
+False_Sharing,padded,2,100000000,Correct,0.0184
+False_Sharing,adjacent,4,100000000,Correct,0.0185
+False_Sharing,padded,4,100000000,Correct,0.0175
+Memory_Sweep,default,1,33554432,Correct,0.1313
+Memory_Sweep,default,2,33554432,Correct,0.0806
+Memory_Sweep,numactl_node0,1,33554432,Correct,0.1866
+Memory_Sweep,numactl_node0,2,33554432,Correct,0.0847
+Pinned_Cores_0_2,adjacent,2,100000000,Correct,0.0266
+Pinned_Cores_0_2,padded,2,100000000,Correct,0.0191
