@@ -1,0 +1,128 @@
+================================================================================
+EXPERIMENT: ANALYZE SYNCHRONIZATION MECHANISMS IN PARALLEL PROGRAMS
+System: Linux sunayana 6.18.33.2-microsoft-standard-WSL2 x86_64
+CPU: 12th Gen Intel(R) Core(TM) i5-12500H (16 vCPUs)
+Compiler: gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+================================================================================
+
+[STEP 5.4 - Verify GCC and OpenMP Runtime]
+$ gcc --version
+gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+$ echo '#include <omp.h>' | gcc -E -fopenmp -xc - > /dev/null && echo OpenMP OK
+OpenMP OK
+
+[STEP 6.1 - 6.5 & STEP 8 - Compiling Programs]
+$ gcc race.c -fopenmp -o race
+$ gcc critical.c -fopenmp -o critical
+$ gcc atomic.c -fopenmp -o atomic
+$ gcc barrier.c -fopenmp -o barrier
+$ gcc semaphore.c -pthread -o semaphore
+$ gcc compare_sync.c -fopenmp -o compare_sync
+
+[STEP 6 & STEP 8 - Individual Program Execution]
+$ ./race
+Counter=2078236
+
+$ ./critical
+Counter=10000000
+
+$ ./atomic
+Counter=10000000
+
+$ ./barrier
+Thread 8 before barrier
+Thread 0 before barrier
+Thread 15 before barrier
+Thread 5 before barrier
+Thread 12 before barrier
+Thread 14 before barrier
+Thread 11 before barrier
+Thread 6 before barrier
+Thread 3 before barrier
+Thread 9 before barrier
+Thread 1 before barrier
+Thread 13 before barrier
+Thread 7 before barrier
+Thread 10 before barrier
+Thread 2 before barrier
+Thread 4 before barrier
+Thread 14 after barrier
+Thread 13 after barrier
+Thread 1 after barrier
+Thread 10 after barrier
+Thread 6 after barrier
+Thread 7 after barrier
+Thread 8 after barrier
+Thread 11 after barrier
+Thread 0 after barrier
+Thread 15 after barrier
+Thread 4 after barrier
+Thread 2 after barrier
+Thread 12 after barrier
+Thread 9 after barrier
+Thread 3 after barrier
+Thread 5 after barrier
+
+$ ./semaphore
+Counter=200000
+
+[STEP 9 - Environment Variable Thread Setting]
+$ OMP_NUM_THREADS=4 ./race
+Counter=2691155
+
+$ OMP_NUM_THREADS=4 ./critical
+Counter=10000000
+
+$ OMP_NUM_THREADS=4 ./atomic
+Counter=10000000
+
+$ OMP_NUM_THREADS=4 ./barrier
+Thread 3 before barrier
+Thread 2 before barrier
+Thread 0 before barrier
+Thread 1 before barrier
+Thread 3 after barrier
+Thread 1 after barrier
+Thread 0 after barrier
+Thread 2 after barrier
+
+$ export OMP_NUM_THREADS=8
+$ ./critical
+Counter=10000000
+
+[STEP 10 - Benchmark Execution Across Thread Counts]
+$ ./compare_sync
+Comparing synchronization mechanisms for 10000000 shared increments
+
+Mechanism | Threads | Final Count | Correctness | Time (s)
+---------------------------------------------------------------
+None       |       1 |     10000000 |    Correct |     0.0130
+Critical   |       1 |     10000000 |    Correct |     0.2849
+Atomic     |       1 |     10000000 |    Correct |     0.1512
+Lock       |       1 |     10000000 |    Correct |     0.2334
+---------------------------------------------------------------
+None       |       2 |      5906567 |  INCORRECT |     0.0207
+Critical   |       2 |     10000000 |    Correct |     0.5845
+Atomic     |       2 |     10000000 |    Correct |     0.2196
+Lock       |       2 |     10000000 |    Correct |     0.7318
+---------------------------------------------------------------
+None       |       4 |      2466803 |  INCORRECT |     0.0264
+Critical   |       4 |     10000000 |    Correct |     1.2342
+Atomic     |       4 |     10000000 |    Correct |     0.2044
+Lock       |       4 |     10000000 |    Correct |     1.3125
+---------------------------------------------------------------
+None       |       8 |      1621902 |  INCORRECT |     0.0306
+Critical   |       8 |     10000000 |    Correct |     2.2584
+Atomic     |       8 |     10000000 |    Correct |     0.2273
+Lock       |       8 |     10000000 |    Correct |     2.2623
+---------------------------------------------------------------
+
+Expected correct final count = 10000000
+Observation: 'None' is fastest but incorrect (race condition).
+'Critical' is correct but slowest (coarse-grained locking).
+'Atomic' and 'Lock' are correct; 'Atomic' scales better since it
+uses lightweight hardware instructions instead of OS-level locks.
