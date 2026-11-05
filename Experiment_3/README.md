@@ -121,21 +121,25 @@ flowchart TD
     end
 
     subgraph SynchMech ["Synchronization Mechanisms"]
-        SM1["None (Race Condition)\n• No lock / No protection\n• Interleaved read-modify-write\n• Fast but INCORRECT"]
-        SM2["Critical Section\n• #pragma omp critical\n• Software mutual exclusion\n• Serializes all threads"]
-        SM3["Atomic Operation\n• #pragma omp atomic\n• Hardware bus-lock instruction\n• Correct & Low Overhead"]
-        SM4["Coarse Lock / Semaphore\n• omp_lock_t / sem_wait()\n• OS token/mutex control\n• High contention overhead"]
+        SM1["None - Race Condition<br/>No Lock Protection<br/>Fast but INCORRECT"]
+        SM2["Critical Section<br/>#pragma omp critical<br/>Serializes all threads"]
+        SM3["Atomic Operation<br/>#pragma omp atomic<br/>Hardware bus-lock instruction"]
+        SM4["Coarse Lock / Semaphore<br/>omp_lock_t / sem_wait<br/>OS token control"]
     end
 
     subgraph SharedData ["Shared Resource"]
-        SR[("Shared Counter Variable\n(10,000,000 increments)")]
+        SR["Shared Counter Variable<br/>10,000,000 increments"]
     end
 
-    T0 & T1 & T2 & T3 --> SynchMech
-    SM1 -.->|Uncontrolled Access (Lost Updates)| SR
-    SM2 -->|Serialized Mutex Access| SR
-    SM3 -->|Atomic Hardware Instruction| SR
-    SM4 -->|Controlled Token Queue| SR
+    T0 --> SM1
+    T1 --> SM2
+    T2 --> SM3
+    T3 --> SM4
+
+    SM1 -.->|"Uncontrolled Access - Lost Updates"| SR
+    SM2 -->|"Serialized Mutex Access"| SR
+    SM3 -->|"Atomic Instruction - Correct"| SR
+    SM4 -->|"Controlled Token Access"| SR
 ```
 
 ---
